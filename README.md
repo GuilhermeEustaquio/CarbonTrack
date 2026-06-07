@@ -33,3 +33,20 @@ Facilitar a **gestão de emissões e a análise ambiental** do transporte corpor
 O CarbonTrack se conecta à **Global Solution 2026/1** ao aplicar georreferenciamento, mapas e análise ambiental ao enfrentamento das emissões de CO₂ no transporte. A arquitetura está preparada para integração real com backend Java, mantendo um modo mock/localStorage funcional para demonstração sem servidor ativo.
 
 ---
+## ⚡ Tecnologias Utilizadas
+
+| Tecnologia | Descrição |
+|---|---|
+| **React** | Biblioteca para construção de interfaces (SPA) |
+| **Vite** | Bundler e servidor de desenvolvimento rápido |
+| **TypeScript** | Superset tipado do JavaScript |
+| **TailwindCSS** | Base de estilização via classes utilitárias |
+| **React Router DOM** | Roteamento entre páginas (rotas estáticas e dinâmicas) |
+| **Leaflet + OpenStreetMap/CARTO** | Mapas e rotas georreferenciadas (sem chave obrigatória) |
+| **Fetch API** | Comunicação com a API REST (nativa, sem Axios) |
+| **Java / Spring Boot** | Backend previsto para integração via REST |
+| **Oracle SQL** | Banco de dados relacional previsto |
+| **Git & GitHub** | Versionamento e hospedagem do código |
+| **Vercel / Render** | Deploy do front-end e da API |
+
+---
