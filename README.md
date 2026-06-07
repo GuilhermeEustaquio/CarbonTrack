@@ -31,3 +31,5 @@ Facilitar a **gestão de emissões e a análise ambiental** do transporte corpor
 ## 🛰️ Conexão com a Global Solution
 
 O CarbonTrack se conecta à **Global Solution 2026/1** ao aplicar georreferenciamento, mapas e análise ambiental ao enfrentamento das emissões de CO₂ no transporte. A arquitetura está preparada para integração real com backend Java, mantendo um modo mock/localStorage funcional para demonstração sem servidor ativo.
+
+---
