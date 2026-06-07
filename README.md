@@ -100,3 +100,19 @@ CarbonTrack/
 ```
 
 ---
+## 🧩 Funcionalidades
+
+- Dashboard ESG com empresas, frota, motoristas, viagens, CO₂ total e alertas ativos.
+- CRUD de empresas, caminhões, motoristas, rotas e viagens.
+- Rotas com nome, origem/destino textuais e coordenadas selecionadas no mapa.
+- Cálculo automático de **consumo estimado** e **CO₂ emitido** por viagem.
+- Emissões e alertas ambientais **somente leitura**, gerados a partir das viagens.
+- Relatórios por empresa, rota, combustível e período, com exportação em CSV.
+- Mapa de rotas georreferenciado (OpenStreetMap/CARTO) com tema claro/escuro.
+- Modo mock/localStorage para demonstração sem backend ativo.
+
+> No modo local, `consumoEstimadoLitros = distanciaPercorridaKm / 3` e
+> `co2EmitidoKg = consumoEstimadoLitros × fator de emissão do combustível`.
+> No modo API, esse cálculo é responsabilidade do backend Java.
+
+---
