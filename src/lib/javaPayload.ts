@@ -1,46 +1,55 @@
-const toNumberId = (value: unknown): number | unknown => {
+// Inclui o ID no payload apenas se for numérico válido (IDs locais como "EMP-001" são omitidos).
+const numId = (value: unknown): number | undefined => {
   const n = Number(value);
-  return Number.isFinite(n) ? n : value;
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
+const digitsOnly = (value: unknown) => String(value ?? '').replace(/\D/g, '');
+
 export function empresaPayload(input: Record<string, unknown>) {
+  const id = numId(input.id);
   return {
-    id: input.id ? toNumberId(input.id) : undefined,
+    ...(id !== undefined ? { id } : {}),
     nome: input.nome,
-    cnpj: input.cnpj,
+    cnpj: digitsOnly(input.cnpj),
     setor: input.setor,
     cidade: input.cidade,
-    estado: input.estado,
+    uf: input.estado,
     responsavel: input.responsavel,
-    dataCadastro: input.dataCadastro,
+    // dataCadastro omitido — gerenciado pelo servidor
   };
 }
 
 export function caminhaoPayload(input: Record<string, unknown>) {
+  const id = numId(input.id);
+  const empresaId = numId(input.empresaId);
   return {
-    id: input.id ? toNumberId(input.id) : undefined,
+    ...(id !== undefined ? { id } : {}),
     placa: input.placa,
     modelo: input.modelo,
     anoFabricacao: Number(input.anoFabricacao ?? 0),
     capacidadeCarga: Number(input.capacidadeCarga ?? 0),
-    empresaId: toNumberId(input.empresaId),
+    ...(empresaId !== undefined ? { empresaId } : {}),
   };
 }
 
 export function motoristaPayload(input: Record<string, unknown>) {
+  const id = numId(input.id);
+  const empresaId = numId(input.empresaId);
   return {
-    id: input.id ? toNumberId(input.id) : undefined,
+    ...(id !== undefined ? { id } : {}),
     nome: input.nome,
-    cpf: input.cpf,
+    cpf: digitsOnly(input.cpf),
     numeroCnh: input.numeroCnh,
     validadeCnh: input.validadeCnh,
-    empresaId: toNumberId(input.empresaId),
+    ...(empresaId !== undefined ? { empresaId } : {}),
   };
 }
 
 export function rotaPayload(input: Record<string, unknown>) {
+  const id = numId(input.id);
   return {
-    id: input.id ? toNumberId(input.id) : undefined,
+    ...(id !== undefined ? { id } : {}),
     nome: input.nome,
     origem: input.origem,
     destino: input.destino,
@@ -54,14 +63,19 @@ export function rotaPayload(input: Record<string, unknown>) {
 }
 
 export function viagemPayload(input: Record<string, unknown>) {
+  const id = numId(input.id);
+  const caminhaoId = numId(input.caminhaoId);
+  const motoristaId = numId(input.motoristaId);
+  const rotaId = numId(input.rotaId);
+  const combustivelId = numId(input.combustivelId);
   return {
-    id: input.id ? toNumberId(input.id) : undefined,
-    dataViagem: input.dataViagem,
+    ...(id !== undefined ? { id } : {}),
+    dtViagem: input.dataViagem,
     cargaTransportadaKg: Number(input.cargaTransportadaKg ?? 0),
     distanciaPercorridaKm: Number(input.distanciaPercorridaKm ?? 0),
-    caminhaoId: toNumberId(input.caminhaoId),
-    motoristaId: toNumberId(input.motoristaId),
-    rotaId: toNumberId(input.rotaId),
-    combustivelId: toNumberId(input.combustivelId),
+    ...(caminhaoId !== undefined ? { caminhaoId } : {}),
+    ...(motoristaId !== undefined ? { motoristaId } : {}),
+    ...(rotaId !== undefined ? { rotaId } : {}),
+    ...(combustivelId !== undefined ? { combustivelId } : {}),
   };
 }

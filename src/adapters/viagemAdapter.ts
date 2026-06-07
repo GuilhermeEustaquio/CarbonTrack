@@ -5,7 +5,7 @@ type Raw = Record<string, unknown>;
 export function toViagem(raw: Raw): Viagem {
   return {
     id: String(raw.id ?? raw.ID ?? raw.idViagem ?? raw.id_viagem ?? raw.ID_VIAGEM ?? ''),
-    dataViagem: String(raw.dataViagem ?? raw.DATA_VIAGEM ?? raw.data_viagem ?? raw.data ?? new Date().toISOString().slice(0, 10)),
+    dataViagem: String(raw.dtViagem ?? raw.dataViagem ?? raw.DATA_VIAGEM ?? raw.data_viagem ?? raw.data ?? new Date().toISOString().slice(0, 10)),
     cargaTransportadaKg: Number(raw.cargaTransportadaKg ?? raw.CARGA_TRANSPORTADA_KG ?? raw.carga_transportada_kg ?? raw.carga ?? 0),
     distanciaPercorridaKm: Number(raw.distanciaPercorridaKm ?? raw.DISTANCIA_PERCORRIDA_KM ?? raw.distancia_percorrida_km ?? raw.distancia ?? 0),
     caminhaoId: String(raw.caminhaoId ?? raw.caminhao_id ?? raw.CAMINHAO_ID ?? raw.ID_CAMINHAO ?? raw.id_caminhao ?? ''),

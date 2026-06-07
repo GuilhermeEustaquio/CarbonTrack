@@ -6,7 +6,9 @@ type Raw = Record<string, unknown>;
 
 export function toEmpresa(raw: Raw): Empresa {
   const emissaoMes = Number(raw.emissaoMes ?? raw.EMISSAO_MES ?? raw.emissao_mes ?? 0);
-  const metaMensal = Number(raw.metaMensal ?? raw.META_MENSAL ?? raw.meta_mensal ?? 0);
+  // O backend Java envia "metaConsumo"; mantemos metaMensal/meta_mensal como fallback
+  // para dados antigos de mock/localStorage. Internamente o front usa "metaMensal".
+  const metaMensal = Number(raw.metaConsumo ?? raw.META_CONSUMO ?? raw.meta_consumo ?? raw.metaMensal ?? raw.META_MENSAL ?? raw.meta_mensal ?? 0);
   const nome = String(raw.nome ?? raw.NOME ?? '');
   const id = String(raw.id ?? raw.ID ?? raw.idEmpresa ?? raw.id_empresa ?? raw.ID_EMPRESA ?? raw.codigo ?? '');
   return {

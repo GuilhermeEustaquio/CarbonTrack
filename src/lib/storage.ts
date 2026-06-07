@@ -8,12 +8,15 @@ import type { Rota } from '../types/rota';
 import type { Viagem } from '../types/viagem';
 import type { Combustivel } from '../types/combustivel';
 
+// Espelha exatamente os dados retornados por GET /combustiveis da API Java.
 export const COMBUSTIVEIS_SEED: Combustivel[] = [
-  { id: '1', nome: 'Diesel S10', fatorEmissaoCarbono: 2.68 },
-  { id: '2', nome: 'Diesel S500', fatorEmissaoCarbono: 2.68 },
-  { id: '3', nome: 'Gasolina C', fatorEmissaoCarbono: 2.31 },
-  { id: '4', nome: 'Etanol hidratado', fatorEmissaoCarbono: 1.51 },
-  { id: '5', nome: 'GNV', fatorEmissaoCarbono: 2.00 },
+  { id: '1', nome: 'Gasolina Pura',   fatorEmissaoCarbono: 2.212 },
+  { id: '2', nome: 'Diesel',           fatorEmissaoCarbono: 2.603 },
+  { id: '3', nome: 'Etanol Hidratado', fatorEmissaoCarbono: 1.457 },
+  { id: '4', nome: 'Etanol Anidro',    fatorEmissaoCarbono: 1.526 },
+  { id: '5', nome: 'Biodiesel (B100)', fatorEmissaoCarbono: 2.431 },
+  { id: '6', nome: 'GLP',             fatorEmissaoCarbono: 2.930 },
+  { id: '7', nome: 'GNV',             fatorEmissaoCarbono: 1.907 },
 ];
 
 /** Banco local — todas as coleções podem ser [] (sem seed). */

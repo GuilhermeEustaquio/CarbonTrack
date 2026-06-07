@@ -3,6 +3,7 @@ import { Icon } from '../components/icons/Icon';
 import { Badge, ConfirmDelete, Field, Modal } from '../components/ui';
 import { useData } from '../context/DataContext';
 import { useToasts } from '../hooks/useToasts';
+import { formatPlaca } from '../utils/masks';
 import type { Caminhao } from '../types/caminhao';
 
 const blank: Partial<Caminhao> = {
@@ -18,7 +19,7 @@ function CaminhaoForm({ inicial, error, onClose, onSave }: { inicial?: Caminhao;
   return (
     <Modal title={inicial ? 'Editar caminhão' : 'Novo caminhão'} sub="Cadastre o veículo para vincular a viagens e calcular emissões automaticamente." onClose={onClose}>
       <div className="form-grid">
-        <Field label="Placa"><input value={f.placa ?? ''} onChange={e => set('placa', e.target.value.toUpperCase())} placeholder="ABC-1234" maxLength={8} required /></Field>
+        <Field label="Placa"><input value={formatPlaca(f.placa ?? '')} onChange={e => set('placa', formatPlaca(e.target.value))} placeholder="ABC-1234 ou ABC1D23" maxLength={8} required /></Field>
         <Field label="Modelo">
           <input value={f.modelo ?? ''} onChange={e => set('modelo', e.target.value)} placeholder="Ex: Volvo FH 540" required />
         </Field>
@@ -36,7 +37,7 @@ function CaminhaoForm({ inicial, error, onClose, onSave }: { inicial?: Caminhao;
 }
 
 export function Caminhoes() {
-  const { caminhoes, empresas, createCaminhao, updateCaminhao, deleteCaminhao } = useData();
+  const { caminhoes, empresas, createCaminhao, updateCaminhao, deleteCaminhao, contarVinculos } = useData();
   const [push, toastNode] = useToasts();
   const [q, setQ] = useState('');
   const [empFiltro, setEmpFiltro] = useState('Todas');
@@ -53,7 +54,7 @@ export function Caminhoes() {
   const save = (input: Partial<Caminhao>) => {
     const result = modal ? updateCaminhao(modal.id, input as Caminhao) : createCaminhao(input as Caminhao);
     if (!result.ok) { setFormError(result.error); return; }
-    setFormError(''); setModal(null); push(result.message ?? 'Caminhão salvo.', 'ok');
+    setFormError(''); setModal(null);
   };
 
   return (
@@ -117,7 +118,7 @@ export function Caminhoes() {
       </div>
 
       {modal !== null && <CaminhaoForm inicial={modal} error={formError} onClose={() => setModal(null)} onSave={save} />}
-      {del && <ConfirmDelete nome={`${del.placa} — ${del.modelo}`} tipo="caminhão" onCancel={() => setDel(null)} onConfirm={() => { const r = deleteCaminhao(del.id); if (r.ok) push(r.message ?? 'Caminhão inativado.', 'ok'); else push(r.error, 'warn'); setDel(null); }} />}
+      {del && <ConfirmDelete nome={`${del.placa} — ${del.modelo}`} tipo="caminhão" vinculos={contarVinculos('caminhao', del.id)} onCancel={() => setDel(null)} onConfirm={async () => { setDel(null); const r = await deleteCaminhao(del.id); if (!r.ok) push(r.error, 'crit'); }} />}
       {toastNode}
     </div>
   );

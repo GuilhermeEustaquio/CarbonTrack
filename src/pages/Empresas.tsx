@@ -43,7 +43,7 @@ function EmpresaForm({ inicial, error, onClose, onSave }: { inicial?: Empresa; e
 
 export function Empresas() {
   const data = useData();
-  const { empresas, createEmpresa, updateEmpresa, deleteEmpresa } = data;
+  const { empresas, createEmpresa, updateEmpresa, deleteEmpresa, contarVinculos } = data;
   const [push, toastNode] = useToasts();
   const [q, setQ] = useState('');
   const [setor, setSetor] = useState('Todos');
@@ -75,14 +75,14 @@ export function Empresas() {
     const result = modal ? updateEmpresa(modal.id, empresa) : createEmpresa(empresa);
     setSaving(false);
     if (!result.ok) { setFormError(result.error); return; }
-    setFormError(''); setModal(null); push(result.message ?? 'Empresa salva com sucesso.', 'ok');
+    setFormError(''); setModal(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!del) return;
-    const result = deleteEmpresa(del.id);
-    if (result.ok) push(result.message ?? 'Empresa inativada com sucesso.', 'ok'); else push(result.error, 'warn');
     setDel(null);
+    const result = await deleteEmpresa(del.id);
+    if (!result.ok) push(result.error, 'crit');
   };
 
   return (
@@ -147,7 +147,7 @@ export function Empresas() {
       </div>
 
       {modal !== null && <EmpresaForm inicial={modal} error={formError} onClose={() => setModal(null)} onSave={save} />}
-      {del && <ConfirmDelete nome={del.nome} tipo="empresa" onCancel={() => setDel(null)} onConfirm={confirmDelete} />}
+      {del && <ConfirmDelete nome={del.nome} tipo="empresa" vinculos={contarVinculos('empresa', del.id)} onCancel={() => setDel(null)} onConfirm={confirmDelete} />}
       {toastNode}
     </div>
   );

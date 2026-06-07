@@ -66,7 +66,7 @@ function ViagemForm({ inicial, error, onClose, onSave }: { inicial?: Viagem; err
 
 export function Viagens() {
   const data = useData();
-  const { viagens, empresas, combustiveis, rotas, mode, createViagem, updateViagem, deleteViagem } = data;
+  const { viagens, empresas, combustiveis, rotas, mode, createViagem, updateViagem, deleteViagem, contarVinculos } = data;
   const [push, toastNode] = useToasts();
   const [q, setQ] = useState('');
   const [modal, setModal] = useState<Viagem | undefined | null>(null);
@@ -96,7 +96,7 @@ export function Viagens() {
   const save = (input: Partial<Viagem>) => {
     const result = modal ? updateViagem(modal.id, input as Viagem) : createViagem(input as Viagem);
     if (!result.ok) { setFormError(result.error); return; }
-    setFormError(''); setModal(null); push(result.message ?? 'Viagem salva.', 'ok');
+    setFormError(''); setModal(null);
   };
 
   return (
@@ -199,7 +199,7 @@ export function Viagens() {
       </div>
 
       {modal !== null && <ViagemForm inicial={modal} error={formError} onClose={() => setModal(null)} onSave={save} />}
-      {del && <ConfirmDelete nome={`Viagem ${del.id}`} tipo="viagem" onCancel={() => setDel(null)} onConfirm={() => { const r = deleteViagem(del.id); if (r.ok) push(r.message ?? 'Viagem removida.', 'ok'); else push(r.error, 'warn'); setDel(null); }} />}
+      {del && <ConfirmDelete nome={`Viagem ${del.id}`} tipo="viagem" vinculos={contarVinculos('viagem', del.id)} onCancel={() => setDel(null)} onConfirm={async () => { setDel(null); const r = await deleteViagem(del.id); if (!r.ok) push(r.error, 'crit'); }} />}
       {toastNode}
     </div>
   );

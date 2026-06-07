@@ -3,6 +3,7 @@ import { Icon } from '../components/icons/Icon';
 import { Badge, ConfirmDelete, Field, Modal } from '../components/ui';
 import { useData } from '../context/DataContext';
 import { useToasts } from '../hooks/useToasts';
+import { formatCpf, unmaskCpf, formatCnh } from '../utils/masks';
 import type { Motorista } from '../types/motorista';
 
 const blank: Partial<Motorista> = {
@@ -18,10 +19,10 @@ function MotoristaForm({ inicial, error, onClose, onSave }: { inicial?: Motorist
     <Modal title={inicial ? 'Editar motorista' : 'Novo motorista'} sub="Vincule o motorista a uma empresa para rastrear emissões por condutor." onClose={onClose}>
       <div className="form-grid">
         <Field label="Nome completo" full><input value={f.nome ?? ''} onChange={e => set('nome', e.target.value)} required /></Field>
-        <Field label="CPF" error={f.cpf && f.cpf.replace(/\D/g,'').length > 0 && f.cpf.replace(/\D/g,'').length !== 11 ? 'CPF deve ter 11 dígitos' : undefined}>
-          <input value={f.cpf ?? ''} onChange={e => set('cpf', e.target.value)} placeholder="000.000.000-00" maxLength={14} required />
+        <Field label="CPF" error={f.cpf && unmaskCpf(f.cpf).length > 0 && unmaskCpf(f.cpf).length !== 11 ? 'CPF deve ter 11 dígitos' : undefined}>
+          <input value={formatCpf(f.cpf ?? '')} onChange={e => set('cpf', unmaskCpf(e.target.value))} placeholder="000.000.000-00" maxLength={14} inputMode="numeric" required />
         </Field>
-        <Field label="Número da CNH"><input value={f.numeroCnh ?? ''} onChange={e => set('numeroCnh', e.target.value.replace(/\D/g, ''))} placeholder="Ex: 12345678901" /></Field>
+        <Field label="Número da CNH"><input value={formatCnh(f.numeroCnh ?? '')} onChange={e => set('numeroCnh', formatCnh(e.target.value))} placeholder="Ex: 12345678901" maxLength={11} inputMode="numeric" /></Field>
         <Field label="Validade da CNH"><input type="date" value={f.validadeCnh ?? ''} onChange={e => set('validadeCnh', e.target.value)} /></Field>
         <Field label="Empresa"><select value={f.empresaId ?? ''} onChange={e => set('empresaId', e.target.value)}><option value="">Selecione…</option>{empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}</select></Field>
         {error && <div className="field full"><div className="field-error">{error}</div></div>}
@@ -35,7 +36,7 @@ function MotoristaForm({ inicial, error, onClose, onSave }: { inicial?: Motorist
 }
 
 export function Motoristas() {
-  const { motoristas, empresas, createMotorista, updateMotorista, deleteMotorista } = useData();
+  const { motoristas, empresas, createMotorista, updateMotorista, deleteMotorista, contarVinculos } = useData();
   const [push, toastNode] = useToasts();
   const [q, setQ] = useState('');
   const [empFiltro, setEmpFiltro] = useState('Todas');
@@ -52,7 +53,7 @@ export function Motoristas() {
   const save = (input: Partial<Motorista>) => {
     const result = modal ? updateMotorista(modal.id, input as Motorista) : createMotorista(input as Motorista);
     if (!result.ok) { setFormError(result.error); return; }
-    setFormError(''); setModal(null); push(result.message ?? 'Motorista salvo.', 'ok');
+    setFormError(''); setModal(null);
   };
 
   return (
@@ -101,7 +102,7 @@ export function Motoristas() {
                 return (
                   <tr key={m.id}>
                     <td className="t-strong">{m.nome}</td>
-                    <td className="t-mono t-muted">{m.cpf}</td>
+                    <td className="t-mono t-muted">{formatCpf(m.cpf)}</td>
                     <td><Badge>{m.numeroCnh}</Badge></td>
                     <td><span style={{ color: vencida ? 'var(--crit)' : 'inherit', fontSize: 12 }}>{m.validadeCnh || '—'}{vencida && ' ⚠️'}</span></td>
                     <td className="t-muted">{m.empresa}</td>
@@ -121,7 +122,7 @@ export function Motoristas() {
       </div>
 
       {modal !== null && <MotoristaForm inicial={modal} error={formError} onClose={() => setModal(null)} onSave={save} />}
-      {del && <ConfirmDelete nome={del.nome} tipo="motorista" onCancel={() => setDel(null)} onConfirm={() => { const r = deleteMotorista(del.id); if (r.ok) push(r.message ?? 'Motorista inativado.', 'ok'); else push(r.error, 'warn'); setDel(null); }} />}
+      {del && <ConfirmDelete nome={del.nome} tipo="motorista" vinculos={contarVinculos('motorista', del.id)} onCancel={() => setDel(null)} onConfirm={async () => { setDel(null); const r = await deleteMotorista(del.id); if (!r.ok) push(r.error, 'crit'); }} />}
       {toastNode}
     </div>
   );

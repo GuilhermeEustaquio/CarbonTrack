@@ -1,5 +1,10 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { isApiEnabled, FORCE_MOCK, API_BASE_URL, apiRequest } from '../services/api';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { isApiEnabled, API_BASE_URL, apiRequest, isDependencyError } from '../services/api';
+import { criarEmpresa as svcCriarEmpresa, atualizarEmpresa as svcAtualizarEmpresa, removerEmpresa as svcRemoverEmpresa } from '../services/empresasService';
+import { criarCaminhao as svcCriarCaminhao, atualizarCaminhao as svcAtualizarCaminhao, removerCaminhao as svcRemoverCaminhao } from '../services/caminhaoService';
+import { criarMotorista as svcCriarMotorista, atualizarMotorista as svcAtualizarMotorista, removerMotorista as svcRemoverMotorista } from '../services/motoristaService';
+import { criarRota as svcCriarRota, atualizarRota as svcAtualizarRota, removerRota as svcRemoverRota } from '../services/rotaService';
+import { criarViagem as svcCriarViagem, atualizarViagem as svcAtualizarViagem, removerViagem as svcRemoverViagem } from '../services/viagemService';
 import type { Alerta } from '../types/alerta';
 import type { AcaoMitigacao, Emissao } from '../types/emissao';
 import type { Empresa } from '../types/empresa';
@@ -17,11 +22,11 @@ import { toViagem } from '../adapters/viagemAdapter';
 import { toEmissao } from '../adapters/emissaoAdapter';
 import { toAlerta } from '../adapters/alertaAdapter';
 import { toCombustivel } from '../adapters/combustivelAdapter';
-import { toUnidade } from '../adapters/unidadeAdapter';
 import {
   loadAllStorage, writeAllStorage, writeStorage, readStorage, clearStorage,
   type Database,
 } from '../lib/storage';
+import { addTombstones, applyTombstones, clearTombstones } from '../lib/tombstones';
 import {
   buildSigla, buildTrend, statusMeta, normalizeCnpj, nextCode,
   calcCo2Viagem, nivelImpacto, CORES_EMPRESA,
@@ -31,6 +36,7 @@ import { isCnpjLengthValid } from '../utils/validators';
 export type DataMode = 'mock' | 'api';
 type Result<T> = { ok: true; data: T; message?: string } | { ok: false; error: string };
 type VoidResult = { ok: true; message?: string } | { ok: false; error: string };
+export type VinculoTipo = 'empresa' | 'caminhao' | 'motorista' | 'rota' | 'viagem';
 
 type EmpresaInput = Partial<Empresa> & Pick<Empresa, 'nome' | 'cnpj' | 'setor' | 'cidade' | 'estado'>;
 type UnidadeInput = Partial<Unidade> & Pick<Unidade, 'nome' | 'empresaId' | 'tipo' | 'risco' | 'uf'>;
@@ -49,7 +55,7 @@ interface DataContextValue extends Database {
   // Empresa CRUD
   createEmpresa: (input: EmpresaInput) => Result<Empresa>;
   updateEmpresa: (id: string, input: EmpresaInput) => Result<Empresa>;
-  deleteEmpresa: (id: string) => VoidResult;
+  deleteEmpresa: (id: string) => Promise<VoidResult>;
   // Unidade CRUD
   createUnidade: (input: UnidadeInput) => Result<Unidade>;
   updateUnidade: (id: string, input: UnidadeInput) => Result<Unidade>;
@@ -57,19 +63,21 @@ interface DataContextValue extends Database {
   // Caminhão CRUD
   createCaminhao: (input: CaminhaoInput) => Result<Caminhao>;
   updateCaminhao: (id: string, input: CaminhaoInput) => Result<Caminhao>;
-  deleteCaminhao: (id: string) => VoidResult;
+  deleteCaminhao: (id: string) => Promise<VoidResult>;
   // Motorista CRUD
   createMotorista: (input: MotoristaInput) => Result<Motorista>;
   updateMotorista: (id: string, input: MotoristaInput) => Result<Motorista>;
-  deleteMotorista: (id: string) => VoidResult;
+  deleteMotorista: (id: string) => Promise<VoidResult>;
   // Rota CRUD
   createRota: (input: RotaInput) => Result<Rota>;
   updateRota: (id: string, input: RotaInput) => Result<Rota>;
-  deleteRota: (id: string) => VoidResult;
+  deleteRota: (id: string) => Promise<VoidResult>;
   // Viagem CRUD
   createViagem: (input: ViagemInput) => Result<Viagem>;
   updateViagem: (id: string, input: ViagemInput) => Result<Viagem>;
-  deleteViagem: (id: string) => VoidResult;
+  deleteViagem: (id: string) => Promise<VoidResult>;
+  // Vínculos (para avisar antes de excluir)
+  contarVinculos: (tipo: VinculoTipo, id: string) => string[];
   // Alerta
   updateAlerta: (id: string, patch: Partial<Alerta>) => Result<Alerta>;
   // Ação de mitigação CRUD
@@ -79,12 +87,20 @@ interface DataContextValue extends Database {
   // Utilitários
   resetLocalData: () => void;
   refreshFromApi: () => void;
+  apiError: string | null;
+  clearApiError: () => void;
+  apiSuccess: string | null;
+  clearApiSuccess: () => void;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
 
 function isMissing(v: unknown) {
   return v === undefined || v === null || String(v).trim() === '';
+}
+
+function pluralize(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`;
 }
 
 function countUnidades(empresas: Empresa[], unidades: Unidade[]): Empresa[] {
@@ -200,15 +216,19 @@ async function fetchOrCache<T>(
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [db, setDb] = useState<Database>(() => loadAllStorage());
+  const [db, setDb] = useState<Database>(() => applyTombstones(loadAllStorage()));
   const [loading, setLoading] = useState(isApiEnabled);
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(isApiEnabled ? null : false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(() => new Date().toISOString());
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [apiSuccess, setApiSuccess] = useState<string | null>(null);
   const mode: DataMode = isApiEnabled ? 'api' : 'mock';
 
-  const fetchAll = () => {
+  const fetchAllRef = useRef<(silent?: boolean) => void>(() => {});
+
+  const fetchAll = (silent = false) => {
     if (!isApiEnabled) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     Promise.allSettled([
       fetchOrCache('/empresas', toEmpresa, 'empresas'),
       fetchOrCache('/caminhoes', toCaminhao, 'caminhoes'),
@@ -217,32 +237,110 @@ export function DataProvider({ children }: { children: ReactNode }) {
       fetchOrCache('/viagens', toViagem, 'viagens'),
       fetchOrCache('/emissoes', toEmissao, 'emissoes'),
       fetchOrCache('/alertas', toAlerta, 'alertas'),
-      fetchOrCache('/unidades', toUnidade, 'unidades'),
       fetchOrCache('/combustiveis', toCombustivel, 'combustiveis'),
     ]).then(results => {
       const payloads = results.map(r =>
         r.status === 'fulfilled' ? r.value : { data: [], fromApi: false }
       );
       setApiAvailable(payloads.some(p => p.fromApi));
-      const [emp, cam, mot, rot, vgm, em, al, un, comb] = payloads.map(p => p.data);
-      const empresas = countUnidades(emp as Empresa[], un as Unidade[]);
-      const newDb: Database = {
+      const [emp, cam, mot, rot, vgm, em, al, comb] = payloads.map(p => p.data);
+      const unidades = readStorage<Unidade>('unidades');
+      const empresas = countUnidades(emp as Empresa[], unidades);
+      const caminhoesList = cam as Caminhao[];
+      const motoristasList = mot as Motorista[];
+      const rotasList = rot as Rota[];
+      // A API não retorna campos denormalizados na viagem (placa, motorista, rota,
+      // empresa). Enriquecemos a partir das entidades relacionadas para a tabela e
+      // o KPI de empresas não ficarem em branco.
+      const viagens = (vgm as Viagem[]).map(v => {
+        const caminhao = caminhoesList.find(c => c.id === v.caminhaoId);
+        const motorista = motoristasList.find(m => m.id === v.motoristaId);
+        const rota = rotasList.find(r => r.id === v.rotaId);
+        const empresa = caminhao ? (emp as Empresa[]).find(e => e.id === caminhao.empresaId) : undefined;
+        return {
+          ...v,
+          placa: v.placa ?? caminhao?.placa,
+          motorista: v.motorista ?? motorista?.nome,
+          rota: v.rota ?? nomeRota(rota),
+          empresa: v.empresa ?? empresa?.nome,
+          empresaId: v.empresaId ?? caminhao?.empresaId,
+        };
+      });
+      const combustiveis = comb as Combustivel[];
+
+      // Fill dataCalculo from viagem.dataViagem when API Emissao doesn't carry it
+      let emissoes: Emissao[] = (em as Emissao[]).map(e => {
+        if (e.dataCalculo) return e;
+        const v = viagens.find(vg => vg.id === e.viagemId);
+        return { ...e, dataCalculo: v?.dataViagem ?? '' };
+      });
+
+      // When API returns no emissoes but has viagens, compute locally so dashboard has data
+      if (emissoes.length === 0 && viagens.length > 0) {
+        emissoes = viagens.map(viagem => {
+          const combustivel = combustiveis.find(c => c.id === viagem.combustivelId);
+          const calc = calcularEmissaoMock(viagem, combustivel);
+          return { ...calc, id: `EMI-${viagem.id}`, dataCalculo: viagem.dataViagem };
+        });
+      }
+
+      let alertas = al as Alerta[];
+      // When API returns no alertas, derive them from emissoes so dashboard has data
+      if (alertas.length === 0 && emissoes.length > 0) {
+        const seedDb = {
+          empresas, caminhoes: caminhoesList, motoristas: motoristasList,
+          rotas: rotasList, viagens, emissoes, alertas: [] as Alerta[],
+          acoes: [] as AcaoMitigacao[], unidades, combustiveis,
+        };
+        alertas = emissoes.reduce((acc: Alerta[], emissao) => {
+          const viagem = viagens.find(v => v.id === emissao.viagemId);
+          if (!viagem) return acc;
+          return upsertAlertaAmbiental({ ...seedDb, alertas: acc }, viagem, emissao);
+        }, []);
+      }
+
+      const newDb: Database = applyTombstones({
         empresas,
-        caminhoes: cam as Caminhao[],
-        motoristas: mot as Motorista[],
-        rotas: rot as Rota[],
-        viagens: vgm as Viagem[],
-        emissoes: normalizeEmissoesPorViagem(em as Emissao[]),
-        alertas: al as Alerta[],
+        caminhoes: caminhoesList,
+        motoristas: motoristasList,
+        rotas: rotasList,
+        viagens,
+        emissoes: normalizeEmissoesPorViagem(emissoes),
+        alertas,
         acoes: readStorage<AcaoMitigacao>('acoes'),
-        unidades: un as Unidade[],
-        combustiveis: comb as Combustivel[],
-      };
+        unidades,
+        combustiveis,
+      });
       setDb(newDb);
       setLastUpdatedAt(new Date().toISOString());
       writeAllStorage(newDb);
-    }).finally(() => setLoading(false));
+    }).finally(() => { if (!silent) setLoading(false); });
   };
+
+  fetchAllRef.current = fetchAll;
+
+  // Envia operação à API em background. Ao concluir re-sincroniza; em erro reverte estado local.
+  const syncApi = (call: () => Promise<unknown>, revert?: () => void, successMsg?: string) => {
+    call()
+      .then(() => {
+        if (successMsg) setApiSuccess(successMsg);
+        fetchAllRef.current(true);
+      })
+      .catch((err: unknown) => {
+        const msg = (err as Error).message;
+        console.error('[API]', msg);
+        setApiError(msg);
+        revert?.();
+        // Reconcilia com o backend: corrige referências obsoletas (ex.: rota/caminhão
+        // que não existem mais no servidor) que causaram a falha, sem deixar lixo local.
+        fetchAllRef.current(true);
+      });
+  };
+
+  const deleteErrorMsg = (err: unknown) =>
+    isDependencyError(err)
+      ? 'Não é possível excluir este item porque existem registros vinculados.'
+      : (err as Error).message;
 
   useEffect(() => { fetchAll(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -262,15 +360,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     mode,
     modeLabel: loading
       ? 'Sincronizando · buscando dados da API'
-      : FORCE_MOCK
-        ? 'Modo local forçado · API ignorada'
-        : mode === 'api'
-          ? apiAvailable
-            ? 'API conectada · backend Java'
-            : 'API indisponível · usando cache/localStorage'
-          : API_BASE_URL
-            ? 'API indisponível · usando cache/localStorage'
-            : 'Coleta local ativa · mock/localStorage',
+      : mode === 'api'
+        ? apiAvailable
+          ? 'API conectada · backend Java'
+          : 'API indisponível · verifique VITE_API_BASE_URL'
+        : API_BASE_URL
+          ? 'API indisponível · verifique VITE_API_BASE_URL'
+          : 'VITE_API_BASE_URL não configurada',
     lastUpdatedAt,
 
     // ── EMPRESA ──────────────────────────────────────────────
@@ -304,8 +400,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         tendencia: [0, 0, 0, 0, 0, 0],
         ativo: true,
       };
+      const prev = db.empresas;
       const next = commit({ ...db, empresas: [empresa, ...db.empresas] });
-      return { ok: true, data: next.empresas.find(e => e.id === id) ?? empresa, message: 'Empresa criada.' };
+      syncApi(() => svcCriarEmpresa(empresa), () => commit({ ...db, empresas: prev }), 'Empresa criada com sucesso.');
+      return { ok: true, data: next.empresas.find(e => e.id === id) ?? empresa };
     },
     updateEmpresa(id, input) {
       const current = db.empresas.find(e => e.id === id);
@@ -322,13 +420,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
         status: statusMeta(Number(input.emissaoMes ?? current.emissaoMes), Number(input.metaMensal ?? current.metaMensal) || 1),
         tendencia: input.tendencia?.length ? input.tendencia : current.tendencia,
       };
+      const prev = db.empresas;
       const next = commit({ ...db, empresas: db.empresas.map(e => e.id === id ? empresa : e), unidades: db.unidades.map(u => u.empresaId === id ? { ...u, empresa: empresa.nome } : u) });
-      return { ok: true, data: next.empresas.find(e => e.id === id) ?? empresa, message: 'Empresa atualizada.' };
+      syncApi(() => svcAtualizarEmpresa(id, empresa), () => commit({ ...db, empresas: prev }), 'Empresa atualizada com sucesso.');
+      return { ok: true, data: next.empresas.find(e => e.id === id) ?? empresa };
     },
-    deleteEmpresa(id) {
+    async deleteEmpresa(id) {
       if (!db.empresas.some(e => e.id === id)) return { ok: false, error: 'Empresa não encontrada.' };
-      commit({ ...db, empresas: db.empresas.map(e => e.id === id ? { ...e, ativo: false } : e) });
-      return { ok: true, message: 'Empresa inativada.' };
+      const caminhoesFilhos = db.caminhoes.filter(c => c.empresaId === id);
+      const motoristasFilhos = db.motoristas.filter(m => m.empresaId === id);
+      const camIds = new Set(caminhoesFilhos.map(c => c.id));
+      const motIds = new Set(motoristasFilhos.map(m => m.id));
+      const viagensFilhas = db.viagens.filter(v => camIds.has(v.caminhaoId) || motIds.has(v.motoristaId) || v.empresaId === id);
+      const vgmIds = new Set(viagensFilhas.map(v => v.id));
+
+      if (!isApiEnabled) {
+        commit({
+          ...db,
+          empresas: db.empresas.map(e => e.id === id ? { ...e, ativo: false } : e),
+          caminhoes: db.caminhoes.map(c => camIds.has(c.id) ? { ...c, ativo: false } : c),
+          motoristas: db.motoristas.map(m => motIds.has(m.id) ? { ...m, ativo: false } : m),
+          viagens: db.viagens.filter(v => !vgmIds.has(v.id)),
+          emissoes: db.emissoes.filter(e => !vgmIds.has(e.viagemId)),
+          alertas: db.alertas.filter(a => a.empresaId !== id && !(a.viagemId && vgmIds.has(a.viagemId))),
+        });
+        setApiSuccess('Empresa excluída com sucesso.');
+        return { ok: true };
+      }
+
+      try {
+        for (const v of viagensFilhas) await svcRemoverViagem(v.id);
+        for (const c of caminhoesFilhos) await svcRemoverCaminhao(c.id);
+        for (const m of motoristasFilhos) await svcRemoverMotorista(m.id);
+        await svcRemoverEmpresa(id);
+        addTombstones({ empresas: [id], caminhoes: [...camIds], motoristas: [...motIds], viagens: [...vgmIds] });
+        setApiSuccess('Empresa excluída com sucesso.');
+        fetchAllRef.current(true);
+        return { ok: true };
+      } catch (err) {
+        const msg = deleteErrorMsg(err);
+        setApiError(msg);
+        return { ok: false, error: msg };
+      }
     },
 
     // ── UNIDADE ──────────────────────────────────────────────
@@ -374,6 +507,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (isMissing(input.placa)) return { ok: false, error: 'Informe a placa.' };
       if (isMissing(input.modelo)) return { ok: false, error: 'Informe o modelo.' };
       if (isMissing(input.empresaId)) return { ok: false, error: 'Selecione a empresa.' };
+      if (!Number.isFinite(Number(input.empresaId))) return { ok: false, error: 'Empresa não sincronizada com a API. Cadastre a empresa primeiro.' };
       const placa = String(input.placa).toUpperCase().trim();
       if (db.caminhoes.some(c => c.ativo !== false && c.placa.replace(/\W/g, '') === placa.replace(/\W/g, '')))
         return { ok: false, error: 'Placa já cadastrada.' };
@@ -388,8 +522,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         empresa: empresa?.nome ?? '',
         ativo: true,
       };
+      const prevCam = db.caminhoes;
       commit({ ...db, caminhoes: [cam, ...db.caminhoes] });
-      return { ok: true, data: cam, message: 'Caminhão cadastrado.' };
+      syncApi(() => svcCriarCaminhao(cam), () => commit({ ...db, caminhoes: prevCam }), 'Caminhão cadastrado com sucesso.');
+      return { ok: true, data: cam };
     },
     updateCaminhao(id, input) {
       const current = db.caminhoes.find(c => c.id === id);
@@ -399,13 +535,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: 'Placa já cadastrada em outro caminhão.' };
       const empresa = db.empresas.find(e => e.id === (input.empresaId ?? current.empresaId));
       const cam: Caminhao = { ...current, ...input, placa, empresa: empresa?.nome ?? current.empresa };
+      const prevCamU = db.caminhoes;
       commit({ ...db, caminhoes: db.caminhoes.map(c => c.id === id ? cam : c) });
-      return { ok: true, data: cam, message: 'Caminhão atualizado.' };
+      syncApi(() => svcAtualizarCaminhao(id, cam), () => commit({ ...db, caminhoes: prevCamU }), 'Caminhão atualizado com sucesso.');
+      return { ok: true, data: cam };
     },
-    deleteCaminhao(id) {
+    async deleteCaminhao(id) {
       if (!db.caminhoes.some(c => c.id === id)) return { ok: false, error: 'Caminhão não encontrado.' };
-      commit({ ...db, caminhoes: db.caminhoes.map(c => c.id === id ? { ...c, ativo: false } : c) });
-      return { ok: true, message: 'Caminhão inativado.' };
+      const viagensFilhas = db.viagens.filter(v => v.caminhaoId === id);
+      const vgmIds = new Set(viagensFilhas.map(v => v.id));
+
+      if (!isApiEnabled) {
+        commit({
+          ...db,
+          caminhoes: db.caminhoes.map(c => c.id === id ? { ...c, ativo: false } : c),
+          viagens: db.viagens.filter(v => !vgmIds.has(v.id)),
+          emissoes: db.emissoes.filter(e => !vgmIds.has(e.viagemId)),
+          alertas: db.alertas.filter(a => !(a.viagemId && vgmIds.has(a.viagemId))),
+        });
+        setApiSuccess('Caminhão excluído com sucesso.');
+        return { ok: true };
+      }
+
+      try {
+        for (const v of viagensFilhas) await svcRemoverViagem(v.id);
+        await svcRemoverCaminhao(id);
+        addTombstones({ caminhoes: [id], viagens: [...vgmIds] });
+        setApiSuccess('Caminhão excluído com sucesso.');
+        fetchAllRef.current(true);
+        return { ok: true };
+      } catch (err) {
+        const msg = deleteErrorMsg(err);
+        setApiError(msg);
+        return { ok: false, error: msg };
+      }
     },
 
     // ── MOTORISTA ────────────────────────────────────────────
@@ -413,6 +576,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (isMissing(input.nome)) return { ok: false, error: 'Informe o nome.' };
       if (isMissing(input.cpf)) return { ok: false, error: 'Informe o CPF.' };
       if (isMissing(input.empresaId)) return { ok: false, error: 'Selecione a empresa.' };
+      if (!Number.isFinite(Number(input.empresaId))) return { ok: false, error: 'Empresa não sincronizada com a API. Cadastre a empresa primeiro.' };
       const cpfNum = String(input.cpf).replace(/\D/g, '');
       if (cpfNum.length !== 11) return { ok: false, error: 'CPF deve ter 11 dígitos.' };
       if (db.motoristas.some(m => m.ativo !== false && m.cpf.replace(/\D/g, '') === cpfNum))
@@ -428,8 +592,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         empresa: empresa?.nome ?? '',
         ativo: true,
       };
+      const prevMot = db.motoristas;
       commit({ ...db, motoristas: [mot, ...db.motoristas] });
-      return { ok: true, data: mot, message: 'Motorista cadastrado.' };
+      syncApi(() => svcCriarMotorista(mot), () => commit({ ...db, motoristas: prevMot }), 'Motorista cadastrado com sucesso.');
+      return { ok: true, data: mot };
     },
     updateMotorista(id, input) {
       const current = db.motoristas.find(m => m.id === id);
@@ -440,13 +606,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: 'CPF já cadastrado em outro motorista.' };
       const empresa = db.empresas.find(e => e.id === (input.empresaId ?? current.empresaId));
       const mot: Motorista = { ...current, ...input, nome: String(input.nome).trim(), cpf: String(input.cpf ?? current.cpf), numeroCnh: String(input.numeroCnh ?? current.numeroCnh).replace(/\D/g, ''), empresa: empresa?.nome ?? current.empresa };
+      const prevMotU = db.motoristas;
       commit({ ...db, motoristas: db.motoristas.map(m => m.id === id ? mot : m) });
-      return { ok: true, data: mot, message: 'Motorista atualizado.' };
+      syncApi(() => svcAtualizarMotorista(id, mot), () => commit({ ...db, motoristas: prevMotU }), 'Motorista atualizado com sucesso.');
+      return { ok: true, data: mot };
     },
-    deleteMotorista(id) {
+    async deleteMotorista(id) {
       if (!db.motoristas.some(m => m.id === id)) return { ok: false, error: 'Motorista não encontrado.' };
-      commit({ ...db, motoristas: db.motoristas.map(m => m.id === id ? { ...m, ativo: false } : m) });
-      return { ok: true, message: 'Motorista inativado.' };
+      const viagensFilhas = db.viagens.filter(v => v.motoristaId === id);
+      const vgmIds = new Set(viagensFilhas.map(v => v.id));
+
+      if (!isApiEnabled) {
+        commit({
+          ...db,
+          motoristas: db.motoristas.map(m => m.id === id ? { ...m, ativo: false } : m),
+          viagens: db.viagens.filter(v => !vgmIds.has(v.id)),
+          emissoes: db.emissoes.filter(e => !vgmIds.has(e.viagemId)),
+          alertas: db.alertas.filter(a => !(a.viagemId && vgmIds.has(a.viagemId))),
+        });
+        setApiSuccess('Motorista excluído com sucesso.');
+        return { ok: true };
+      }
+
+      try {
+        for (const v of viagensFilhas) await svcRemoverViagem(v.id);
+        await svcRemoverMotorista(id);
+        addTombstones({ motoristas: [id], viagens: [...vgmIds] });
+        setApiSuccess('Motorista excluído com sucesso.');
+        fetchAllRef.current(true);
+        return { ok: true };
+      } catch (err) {
+        const msg = deleteErrorMsg(err);
+        setApiError(msg);
+        return { ok: false, error: msg };
+      }
     },
 
     // ── ROTA ─────────────────────────────────────────────────
@@ -469,8 +662,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         destinoLon: input.destinoLon === undefined ? undefined : Number(input.destinoLon),
         ativo: true,
       };
+      const prevRot = db.rotas;
       commit({ ...db, rotas: [rota, ...db.rotas] });
-      return { ok: true, data: rota, message: 'Rota cadastrada.' };
+      syncApi(() => svcCriarRota(rota), () => commit({ ...db, rotas: prevRot }), 'Rota cadastrada com sucesso.');
+      return { ok: true, data: rota };
     },
     updateRota(id, input) {
       const current = db.rotas.find(r => r.id === id);
@@ -488,13 +683,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
         destinoLat: input.destinoLat === undefined ? current.destinoLat : Number(input.destinoLat),
         destinoLon: input.destinoLon === undefined ? current.destinoLon : Number(input.destinoLon),
       };
+      const prevRotU = db.rotas;
       commit({ ...db, rotas: db.rotas.map(r => r.id === id ? rota : r) });
-      return { ok: true, data: rota, message: 'Rota atualizada.' };
+      syncApi(() => svcAtualizarRota(id, rota), () => commit({ ...db, rotas: prevRotU }), 'Rota atualizada com sucesso.');
+      return { ok: true, data: rota };
     },
-    deleteRota(id) {
+    async deleteRota(id) {
       if (!db.rotas.some(r => r.id === id)) return { ok: false, error: 'Rota não encontrada.' };
-      commit({ ...db, rotas: db.rotas.map(r => r.id === id ? { ...r, ativo: false } : r) });
-      return { ok: true, message: 'Rota inativada.' };
+      const viagensFilhas = db.viagens.filter(v => v.rotaId === id);
+      const vgmIds = new Set(viagensFilhas.map(v => v.id));
+
+      if (!isApiEnabled) {
+        commit({
+          ...db,
+          rotas: db.rotas.map(r => r.id === id ? { ...r, ativo: false } : r),
+          viagens: db.viagens.filter(v => !vgmIds.has(v.id)),
+          emissoes: db.emissoes.filter(e => !vgmIds.has(e.viagemId)),
+          alertas: db.alertas.filter(a => !(a.viagemId && vgmIds.has(a.viagemId))),
+        });
+        setApiSuccess('Rota excluída com sucesso.');
+        return { ok: true };
+      }
+
+      try {
+        for (const v of viagensFilhas) await svcRemoverViagem(v.id);
+        await svcRemoverRota(id);
+        addTombstones({ rotas: [id], viagens: [...vgmIds] });
+        setApiSuccess('Rota excluída com sucesso.');
+        fetchAllRef.current(true);
+        return { ok: true };
+      } catch (err) {
+        const msg = deleteErrorMsg(err);
+        setApiError(msg);
+        return { ok: false, error: msg };
+      }
     },
 
     // ── VIAGEM ───────────────────────────────────────────────
@@ -504,42 +726,105 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (isMissing(input.rotaId)) return { ok: false, error: 'Selecione a rota.' };
       if (isMissing(input.combustivelId)) return { ok: false, error: 'Selecione o combustível.' };
       if (!Number.isFinite(Number(input.distanciaPercorridaKm)) || Number(input.distanciaPercorridaKm) <= 0)
-        return { ok: false, error: 'Informe a distância percorrida.' };
+        return { ok: false, error: 'Informe a distância percorrida (deve ser maior que zero).' };
+      if (!Number.isFinite(Number(input.cargaTransportadaKg)) || Number(input.cargaTransportadaKg) <= 0)
+        return { ok: false, error: 'Informe a carga transportada (deve ser maior que zero).' };
       if (isMissing(input.dataViagem)) return { ok: false, error: 'Informe a data da viagem.' };
+      if (new Date(String(input.dataViagem)) > new Date()) return { ok: false, error: 'A data da viagem não pode ser futura.' };
+      if (!Number.isFinite(Number(input.caminhaoId))) return { ok: false, error: 'Caminhão não sincronizado com a API. Recadastre o caminhão.' };
+      if (!Number.isFinite(Number(input.motoristaId))) return { ok: false, error: 'Motorista não sincronizado com a API. Recadastre o motorista.' };
+      if (!Number.isFinite(Number(input.rotaId))) return { ok: false, error: 'Rota não sincronizada com a API. Recadastre a rota.' };
+      if (!Number.isFinite(Number(input.combustivelId))) return { ok: false, error: 'Combustível inválido. Recarregue a página.' };
 
       const viagem = buildViagemView(input, db);
       const combustivel = db.combustiveis.find(c => c.id === viagem.combustivelId);
       const calculada = calcularEmissaoMock(viagem, combustivel);
       const { emissao, emissoes } = upsertEmissaoPorViagem(db, viagem, calculada);
       const alertas = upsertAlertaAmbiental({ ...db, emissoes }, viagem, emissao);
+      const prevVgm = { viagens: db.viagens, emissoes: db.emissoes, alertas: db.alertas };
       commit({ ...db, viagens: [viagem, ...db.viagens], emissoes, alertas });
-      return { ok: true, data: viagem, message: 'Viagem registrada com emissão automática local.' };
+      syncApi(() => svcCriarViagem(viagem), () => commit({ ...db, ...prevVgm }), 'Viagem registrada com sucesso.');
+      return { ok: true, data: viagem };
     },
     updateViagem(id, input) {
       const current = db.viagens.find(v => v.id === id);
       if (!current) return { ok: false, error: 'Viagem não encontrada.' };
       const mergedInput = { ...current, ...input };
       if (!Number.isFinite(Number(mergedInput.distanciaPercorridaKm)) || Number(mergedInput.distanciaPercorridaKm) <= 0)
-        return { ok: false, error: 'Informe a distância percorrida.' };
+        return { ok: false, error: 'Informe a distância percorrida (deve ser maior que zero).' };
+      if (!Number.isFinite(Number(mergedInput.cargaTransportadaKg)) || Number(mergedInput.cargaTransportadaKg) <= 0)
+        return { ok: false, error: 'Informe a carga transportada (deve ser maior que zero).' };
       if (isMissing(mergedInput.dataViagem)) return { ok: false, error: 'Informe a data da viagem.' };
+      if (new Date(String(mergedInput.dataViagem)) > new Date()) return { ok: false, error: 'A data da viagem não pode ser futura.' };
+      if (!Number.isFinite(Number(mergedInput.caminhaoId))) return { ok: false, error: 'Caminhão não sincronizado com a API. Recadastre o caminhão.' };
+      if (!Number.isFinite(Number(mergedInput.motoristaId))) return { ok: false, error: 'Motorista não sincronizado com a API. Recadastre o motorista.' };
+      if (!Number.isFinite(Number(mergedInput.rotaId))) return { ok: false, error: 'Rota não sincronizada com a API. Recadastre a rota.' };
 
       const viagem = buildViagemView(mergedInput, db, current);
       const combustivel = db.combustiveis.find(c => c.id === viagem.combustivelId);
       const calculada = calcularEmissaoMock(viagem, combustivel);
       const { emissao, emissoes } = upsertEmissaoPorViagem(db, viagem, calculada);
       const alertas = upsertAlertaAmbiental({ ...db, emissoes }, viagem, emissao);
+      const prevVgmU = { viagens: db.viagens, emissoes: db.emissoes, alertas: db.alertas };
       commit({ ...db, viagens: db.viagens.map(v => v.id === id ? viagem : v), emissoes, alertas });
-      return { ok: true, data: viagem, message: 'Viagem atualizada com emissão recalculada.' };
+      syncApi(() => svcAtualizarViagem(id, viagem), () => commit({ ...db, ...prevVgmU }), 'Viagem atualizada com sucesso.');
+      return { ok: true, data: viagem };
     },
-    deleteViagem(id) {
+    async deleteViagem(id) {
       if (!db.viagens.some(v => v.id === id)) return { ok: false, error: 'Viagem não encontrada.' };
-      commit({
-        ...db,
-        viagens: db.viagens.filter(v => v.id !== id),
-        emissoes: db.emissoes.filter(e => e.viagemId !== id),
-        alertas: db.alertas.filter(a => !alertaRefereViagem(a, id)),
-      });
-      return { ok: true, message: 'Viagem removida com emissão e alerta automático vinculados.' };
+
+      if (!isApiEnabled) {
+        commit({
+          ...db,
+          viagens: db.viagens.filter(v => v.id !== id),
+          emissoes: db.emissoes.filter(e => e.viagemId !== id),
+          alertas: db.alertas.filter(a => !alertaRefereViagem(a, id)),
+        });
+        setApiSuccess('Viagem removida com sucesso.');
+        return { ok: true };
+      }
+
+      try {
+        await svcRemoverViagem(id);
+        addTombstones({ viagens: [id] });
+        setApiSuccess('Viagem removida com sucesso.');
+        fetchAllRef.current(true);
+        return { ok: true };
+      } catch (err) {
+        const msg = deleteErrorMsg(err);
+        setApiError(msg);
+        return { ok: false, error: msg };
+      }
+    },
+
+    // ── VÍNCULOS ─────────────────────────────────────────────
+    // Conta os registros que dependem do item, para avisar no diálogo de
+    // exclusão. Espelha exatamente a cascata calculada em cada deleteXxx.
+    contarVinculos(tipo, id) {
+      const out: string[] = [];
+      if (tipo === 'empresa') {
+        const camIds = new Set(db.caminhoes.filter(c => c.empresaId === id).map(c => c.id));
+        const motIds = new Set(db.motoristas.filter(m => m.empresaId === id).map(m => m.id));
+        const cam = db.caminhoes.filter(c => c.empresaId === id && c.ativo !== false).length;
+        const mot = db.motoristas.filter(m => m.empresaId === id && m.ativo !== false).length;
+        const vgm = db.viagens.filter(v => camIds.has(v.caminhaoId) || motIds.has(v.motoristaId) || v.empresaId === id).length;
+        if (cam) out.push(pluralize(cam, 'caminhão', 'caminhões'));
+        if (mot) out.push(pluralize(mot, 'motorista', 'motoristas'));
+        if (vgm) out.push(pluralize(vgm, 'viagem', 'viagens'));
+      } else if (tipo === 'caminhao') {
+        const vgm = db.viagens.filter(v => v.caminhaoId === id).length;
+        if (vgm) out.push(pluralize(vgm, 'viagem', 'viagens'));
+      } else if (tipo === 'motorista') {
+        const vgm = db.viagens.filter(v => v.motoristaId === id).length;
+        if (vgm) out.push(pluralize(vgm, 'viagem', 'viagens'));
+      } else if (tipo === 'rota') {
+        const vgm = db.viagens.filter(v => v.rotaId === id).length;
+        if (vgm) out.push(pluralize(vgm, 'viagem', 'viagens'));
+      } else if (tipo === 'viagem') {
+        const em = db.emissoes.filter(e => e.viagemId === id).length;
+        if (em) out.push(pluralize(em, 'emissão', 'emissões'));
+      }
+      return out;
     },
 
     // ── ALERTA ───────────────────────────────────────────────
@@ -585,12 +870,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     resetLocalData() {
       clearStorage();
-      setDb(loadAllStorage()); // retorna coleções locais limpas com combustíveis seedados
+      clearTombstones();
+      setDb(loadAllStorage());
       setLastUpdatedAt(new Date().toISOString());
     },
     refreshFromApi: fetchAll,
+    apiError,
+    clearApiError: () => setApiError(null),
+    apiSuccess,
+    clearApiSuccess: () => setApiSuccess(null),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [db, loading, mode, apiAvailable, lastUpdatedAt]);
+  }), [db, loading, mode, apiAvailable, lastUpdatedAt, apiError, apiSuccess]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

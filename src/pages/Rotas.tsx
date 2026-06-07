@@ -95,7 +95,7 @@ function RotaForm({ inicial, error, onClose, onSave }: {
 }
 
 export function Rotas() {
-  const { rotas, createRota, updateRota, deleteRota } = useData();
+  const { rotas, createRota, updateRota, deleteRota, contarVinculos } = useData();
   const [push, toastNode] = useToasts();
   const [q, setQ] = useState('');
   const [regiaoFiltro, setRegiaoFiltro] = useState('Todas');
@@ -112,7 +112,7 @@ export function Rotas() {
   const save = (input: Partial<Rota>) => {
     const result = modal ? updateRota(modal.id, input as Rota) : createRota(input as Rota);
     if (!result.ok) { setFormError(result.error); return; }
-    setFormError(''); setModal(null); push(result.message ?? 'Rota salva.', 'ok');
+    setFormError(''); setModal(null);
   };
 
   return (
@@ -203,8 +203,9 @@ export function Rotas() {
         <ConfirmDelete
           nome={del.nome || `${del.origem} → ${del.destino}`}
           tipo="rota"
+          vinculos={contarVinculos('rota', del.id)}
           onCancel={() => setDel(null)}
-          onConfirm={() => { const r2 = deleteRota(del.id); if (r2.ok) push(r2.message ?? 'Rota inativada.', 'ok'); else push(r2.error, 'warn'); setDel(null); }}
+          onConfirm={async () => { setDel(null); const r2 = await deleteRota(del.id); if (!r2.ok) push(r2.error, 'crit'); }}
         />
       )}
       {toastNode}
