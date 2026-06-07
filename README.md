@@ -50,3 +50,14 @@ O CarbonTrack se conecta à **Global Solution 2026/1** ao aplicar georreferencia
 | **Vercel / Render** | Deploy do front-end e da API |
 
 ---
+## 🏗️ Arquitetura
+
+```text
+React/Vite → API Java/Spring Boot → Oracle SQL
+```
+
+O front-end **não conecta diretamente ao Oracle**. A integração real ocorre via `VITE_API_BASE_URL`, apontando para a API Java. Quando a API não está configurada ou indisponível, o sistema usa **mock/localStorage** para manter a demonstração funcional, e `VITE_FORCE_MOCK=true` força o modo local mesmo com a URL configurada.
+
+Os dados são normalizados por **adapters** (aceitam IDs `Long`/`number` da API e diferentes convenções de nomes), e os **payloads** enviados respeitam as classes Java, sem mandar campos visuais que existem apenas no front.
+
+---
