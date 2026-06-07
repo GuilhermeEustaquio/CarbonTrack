@@ -18,7 +18,7 @@ const blank: Empresa = {
 function EmpresaForm({ inicial, error, onClose, onSave }: { inicial?: Empresa; error?: string; onClose: () => void; onSave: (e: Empresa) => void }) {
   const [f, setF] = useState<Empresa>(inicial ?? blank);
   const set = (k: keyof Empresa, v: string | number) => setF(o => ({ ...o, [k]: v }));
-  const valid = Boolean(f.nome && f.cnpj && isCnpjLengthValid(f.cnpj) && f.setor && f.cidade && f.estado && f.responsavel);
+  const valid = Boolean(f.nome && f.cnpj && isCnpjLengthValid(f.cnpj) && f.setor && f.cidade && f.estado && f.responsavel && Number(f.metaMensal) > 0);
   return (
     <Modal title={inicial ? 'Editar empresa' : 'Nova empresa'} sub="Dados persistem localmente até a API Java real estar disponível." onClose={onClose}>
       <div className="form-grid">
@@ -30,8 +30,8 @@ function EmpresaForm({ inicial, error, onClose, onSave }: { inicial?: Empresa; e
         <Field label="Setor"><select value={f.setor} onChange={e => set('setor', e.target.value)}>{SETORES.filter(s => s !== 'Todos').map(s => <option key={s}>{s}</option>)}</select></Field>
         <Field label="Cidade"><input value={f.cidade} onChange={e => set('cidade', e.target.value)} /></Field>
         <Field label="Estado"><select value={f.estado} onChange={e => set('estado', e.target.value)}>{UFS.map(u => <option key={u}>{u}</option>)}</select></Field>
-        <Field label="Meta mensal visual (t CO₂)" opt><input type="number" min="0" value={f.metaMensal} onChange={e => set('metaMensal', Number(e.target.value))} /></Field>
-        {error && !error.includes('CNPJ') && <div className="field full"><div className="field-error">{error}</div></div>}
+        <Field label="Meta de consumo mensal (t CO₂)" hint="Deve ser maior que zero." error={f.metaMensal > 0 ? undefined : error?.toLowerCase().includes('consumo') ? error : undefined}><input type="number" min="0" step="0.01" value={f.metaMensal} onChange={e => set('metaMensal', Number(e.target.value))} required /></Field>
+        {error && !error.includes('CNPJ') && !error.toLowerCase().includes('consumo') && <div className="field full"><div className="field-error">{error}</div></div>}
       </div>
       <div className="modal-actions">
         <button className="btn ghost" onClick={onClose}>Cancelar</button>

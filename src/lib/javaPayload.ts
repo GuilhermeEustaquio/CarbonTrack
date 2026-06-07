@@ -16,6 +16,9 @@ export function empresaPayload(input: Record<string, unknown>) {
     cidade: input.cidade,
     uf: input.estado,
     responsavel: input.responsavel,
+    // Meta de consumo (t CO₂). O backend Java expõe este campo como "metaConsumo";
+    // internamente o front usa "metaMensal", então traduzimos aqui na fronteira da API.
+    metaConsumo: Number(input.metaMensal ?? 0),
     // dataCadastro omitido — gerenciado pelo servidor
   };
 }

@@ -377,6 +377,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (isMissing(input.setor)) return { ok: false, error: 'Informe o setor.' };
       if (isMissing(input.cidade)) return { ok: false, error: 'Informe a cidade.' };
       if (isMissing(input.estado)) return { ok: false, error: 'Informe o estado.' };
+      if (!(Number(input.metaMensal) > 0)) return { ok: false, error: 'A meta de consumo deve ser maior que zero.' };
       const cnpjNorm = normalizeCnpj(String(input.cnpj));
       if (db.empresas.some(e => e.ativo !== false && normalizeCnpj(e.cnpj) === cnpjNorm))
         return { ok: false, error: 'CNPJ já cadastrado.' };
@@ -409,6 +410,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const current = db.empresas.find(e => e.id === id);
       if (!current) return { ok: false, error: 'Empresa não encontrada.' };
       if (isMissing(input.nome)) return { ok: false, error: 'Informe o nome.' };
+      if (!(Number(input.metaMensal ?? current.metaMensal) > 0)) return { ok: false, error: 'A meta de consumo deve ser maior que zero.' };
       const cnpjNorm = normalizeCnpj(String(input.cnpj ?? current.cnpj));
       if (db.empresas.some(e => e.id !== id && e.ativo !== false && normalizeCnpj(e.cnpj) === cnpjNorm))
         return { ok: false, error: 'CNPJ já cadastrado em outra empresa.' };
