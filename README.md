@@ -21,3 +21,13 @@ Empresas de **logística e transporte** geram emissões de CO₂ diariamente, ma
 Desenvolvemos uma **SPA centralizada** que transforma registros operacionais de viagens em **indicadores ambientais**. A partir de empresas, caminhões, motoristas, rotas e combustíveis, o sistema calcula emissões de CO₂ automaticamente, gera alertas ambientais e organiza relatórios para apoiar decisões ESG.
 
 A solução mantém a narrativa de **economia espacial** aplicada a um problema real da Terra: as emissões logísticas. O uso de mapas, coordenadas e dados georreferenciados permite visualizar rotas, origem, destino, distância, região e impactos ambientais por viagem.
+
+### 🎯 Objetivo
+
+Facilitar a **gestão de emissões e a análise ambiental** do transporte corporativo, oferecendo dashboard, ranking ESG, cálculo automático de CO₂ e relatórios — tudo preparado para consumir uma API Java/Spring Boot integrada ao Oracle SQL.
+
+---
+
+## 🛰️ Conexão com a Global Solution
+
+O CarbonTrack se conecta à **Global Solution 2026/1** ao aplicar georreferenciamento, mapas e análise ambiental ao enfrentamento das emissões de CO₂ no transporte. A arquitetura está preparada para integração real com backend Java, mantendo um modo mock/localStorage funcional para demonstração sem servidor ativo.
