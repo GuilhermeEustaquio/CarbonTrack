@@ -116,3 +116,151 @@ CarbonTrack/
 > No modo API, esse cálculo é responsabilidade do backend Java.
 
 ---
+## 🚀 Como Usar
+
+### Links Importantes
+
+| Recurso | Link |
+|---|---|
+| 📁 Repositório GitHub | [github.com/guilhermeeustaquio/CarbonTrack](https://github.com/guilhermeeustaquio/CarbonTrack) |
+| 🌐 Deploy Front (Vercel) | [INSERIR LINK DO DEPLOY] |
+| ⚙️ API Java (Render) | [globalsolution2-java.onrender.com](https://globalsolution2-java.onrender.com) |
+| 🎬 Vídeo de Demonstração | [INSERIR LINK DO VÍDEO] |
+
+### Rodando Localmente
+
+**1. Clone o repositório**
+```bash
+git clone https://github.com/guilhermeeustaquio/CarbonTrack.git
+```
+
+**2. Acesse a pasta do projeto**
+```bash
+cd CarbonTrack
+```
+
+**3. Instale as dependências**
+```bash
+npm install
+```
+
+**4. Configure as variáveis de ambiente** *(opcional — sem isso, usa dados mockados)*
+```bash
+cp .env.example .env
+# Edite o .env e defina VITE_API_BASE_URL com a URL do backend Java
+# Exemplo: VITE_API_BASE_URL=https://globalsolution2-java.onrender.com
+```
+
+**5. Execute o projeto**
+```bash
+npm run dev
+```
+
+**6. Acesse no navegador**
+```text
+http://localhost:5173/
+```
+
+### Variáveis de Ambiente
+
+| Variável | Descrição |
+|---|---|
+| `VITE_API_BASE_URL` | URL base da API Java/Spring Boot (sem barra no final). Vazia = modo mock. |
+| `VITE_FORCE_MOCK` | `true` força o fallback local mesmo com a API configurada. |
+
+### Outros Comandos
+
+```bash
+npm run build    # Gera o build de produção
+npm run preview  # Visualiza o build localmente
+npm run lint     # Executa o ESLint (se configurado)
+```
+
+---
+
+## 👥 Autores
+
+<table>
+  <tr>
+    <th>Foto</th>
+    <th>Nome</th>
+    <th>RM</th>
+    <th>Turma</th>
+    <th>GitHub</th>
+    <th>LinkedIn</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/guilhermeeustaquio.png" alt="Guilherme Eustaquio" width="80" style="border-radius:50%"/>
+    </td>
+    <td><strong>Guilherme Eustaquio</strong></td>
+    <td>566784</td>
+    <td>1TDSPS</td>
+    <td>
+      <a href="https://github.com/guilhermeeustaquio">
+        <img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"/>
+      </a>
+    </td>
+    <td>
+      <a href="https://www.linkedin.com/in/guilhermeeustaquio">
+        <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn"/>
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/caioccouto.png" alt="Caio Cantini Couto" width="80" style="border-radius:50%"/>
+    </td>
+    <td><strong>Caio Cantini Couto</strong></td>
+    <td>563452</td>
+    <td>1TDSPS</td>
+    <td>
+      <a href="https://github.com/caioccouto">
+        <img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"/>
+      </a>
+    </td>
+    <td>
+      <a href="https://www.linkedin.com/in/caio-couto-44b849326">
+        <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn"/>
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/manovares.png" alt="Matheus Tavares" width="80" style="border-radius:50%"/>
+    </td>
+    <td><strong>Matheus Tavares</strong></td>
+    <td>566844</td>
+    <td>1TDSPS</td>
+    <td>
+      <a href="https://github.com/manovares">
+        <img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"/>
+      </a>
+    </td>
+    <td>
+      <a href="https://www.linkedin.com/in/manovares">
+        <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn"/>
+      </a>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 📬 Contato
+
+Entre em contato com a equipe pelos perfis do LinkedIn acima ou abra uma [issue no repositório](https://github.com/guilhermeeustaquio/CarbonTrack/issues).
+
+---
+
+## 📌 Observações
+
+- Este repositório é destinado à avaliação acadêmica do projeto (FIAP — Global Solution 2026/1).
+- O fluxo correto da arquitetura é **React/Vite → API Java/Spring Boot → Oracle SQL**; o front nunca acessa o Oracle diretamente.
+- A área de gestão funciona com **dados mockados** quando `VITE_API_BASE_URL` não está configurada.
+- Emissões e alertas são **somente leitura**: são derivados das viagens, não cadastrados manualmente.
+- Não há autenticação nesta versão.
+
+<div align="center">
+  <sub>Desenvolvido pela equipe EcoOrbit Solutions — FIAP 1TDS</sub>
+</div>
