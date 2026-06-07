@@ -61,3 +61,42 @@ O front-end **não conecta diretamente ao Oracle**. A integração real ocorre v
 Os dados são normalizados por **adapters** (aceitam IDs `Long`/`number` da API e diferentes convenções de nomes), e os **payloads** enviados respeitam as classes Java, sem mandar campos visuais que existem apenas no front.
 
 ---
+# 📁 Estrutura de Pastas
+
+```text
+CarbonTrack/
+├── public/
+│   └── favicon.svg
+├── src/
+│   ├── adapters/                  # Normalização dos dados vindos da API Java
+│   ├── components/
+│   │   ├── charts/                # Sparkline, AreaChart, Donut, Gauge, BarList (SVG puro)
+│   │   ├── icons/                 # Icon.tsx + biblioteca de paths SVG
+│   │   ├── maps/                  # RotaMap e RoutePickerMap (Leaflet)
+│   │   └── ui/                    # Button, Badge, Modal, Card, Toasts, etc.
+│   ├── context/
+│   │   └── DataContext.tsx        # Estado global, CRUD e sincronização com a API
+│   ├── hooks/                     # useData, useTheme, useToasts, etc.
+│   ├── layouts/
+│   │   └── AppLayout.tsx          # Sidebar, topbar e layout geral
+│   ├── lib/                       # constants, selectors, storage, tombstones, javaPayload
+│   ├── pages/                     # Home, Dashboard, Empresas, Caminhoes, ...
+│   ├── routes/
+│   │   └── AppRoutes.tsx          # Definição das rotas
+│   ├── services/                  # api.ts + serviços por entidade
+│   ├── styles/
+│   │   └── index.css              # Design system (dark-first)
+│   ├── types/                     # Tipos TypeScript globais
+│   ├── utils/                     # masks, validators, formatters
+│   ├── App.tsx                    # Componente raiz
+│   └── main.tsx                   # Ponto de entrada
+├── .env.example                   # Variáveis de ambiente de exemplo
+├── index.html
+├── postcss.config.js
+├── tailwind.config.js
+├── tsconfig.json
+├── vercel.json
+└── vite.config.ts
+```
+
+---
