@@ -1,2 +1,136 @@
-import { useState } from 'react'; import { Field, useToasts } from '../components/ui'; import { Icon } from '../components/icons/Icon';
-export function Contato(){const [push,node]=useToasts(); const [f,setF]=useState({nome:'',email:'',assunto:'',mensagem:''}); const [err,setErr]=useState<Record<string,string>>({}); const submit=()=>{const e:Record<string,string>={}; if(!f.nome)e.nome='Informe seu nome.'; if(!/\S+@\S+\.\S+/.test(f.email))e.email='Informe um e-mail válido.'; if(!f.assunto)e.assunto='Informe o assunto.'; if(f.mensagem.length<10)e.mensagem='Mensagem deve ter ao menos 10 caracteres.'; setErr(e); if(!Object.keys(e).length){push('Mensagem enviada com sucesso.','ok'); setF({nome:'',email:'',assunto:'',mensagem:''});}}; return <div className="view-enter"><div className="page-head"><div><div className="eyebrow">Contato</div><h1>Fale com a <em>equipe</em></h1><div className="sub">Entre em contato com o time CarbonTrack.</div></div></div><div className="grid-2"><section className="card"><div className="form-grid"><Field label="Nome" error={err.nome}><input value={f.nome} onChange={e=>setF({...f,nome:e.target.value})}/></Field><Field label="E-mail" error={err.email}><input value={f.email} onChange={e=>setF({...f,email:e.target.value})}/></Field><Field label="Assunto" error={err.assunto}><input value={f.assunto} onChange={e=>setF({...f,assunto:e.target.value})}/></Field><Field label="Mensagem" error={err.mensagem}><textarea value={f.mensagem} onChange={e=>setF({...f,mensagem:e.target.value})}/></Field></div><div className="modal-actions"><button className="btn primary" onClick={submit}><Icon name="check"/>Enviar mensagem</button></div></section><section className="card"><h3>Dados da equipe</h3><p>Turma 1TDSPS · Global Solution 2026/1</p><p>Contato institucional: [INSERIR CONTATO]</p><p>GitHub: [INSERIR LINK DO GITHUB]</p></section></div>{node}</div>}
+import { useState } from 'react';
+import { Field, useToasts } from '../components/ui';
+import { Icon } from '../components/icons/Icon';
+
+export function Contato() {
+  const [push, node] = useToasts();
+
+  const [f, setF] = useState({
+    nome: '',
+    email: '',
+    assunto: '',
+    mensagem: '',
+  });
+
+  const [err, setErr] = useState<Record<string, string>>({});
+
+  const submit = () => {
+    const e: Record<string, string> = {};
+
+    if (!f.nome) {
+      e.nome = 'Informe seu nome.';
+    }
+
+    if (!/\S+@\S+\.\S+/.test(f.email)) {
+      e.email = 'Informe um e-mail válido.';
+    }
+
+    if (!f.assunto) {
+      e.assunto = 'Informe o assunto.';
+    }
+
+    if (f.mensagem.length < 10) {
+      e.mensagem = 'Mensagem deve ter ao menos 10 caracteres.';
+    }
+
+    setErr(e);
+
+    if (!Object.keys(e).length) {
+      push('Mensagem enviada com sucesso.', 'ok');
+
+      setF({
+        nome: '',
+        email: '',
+        assunto: '',
+        mensagem: '',
+      });
+    }
+  };
+
+  return (
+    <div className="view-enter">
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Contato</div>
+
+          <h1>
+            Fale com a <em>equipe</em>
+          </h1>
+
+          <div className="sub">Entre em contato com o time CarbonTrack.</div>
+        </div>
+      </div>
+
+      <div className="grid-2">
+        <section className="card">
+          <div className="form-grid">
+            <Field label="Nome" error={err.nome}>
+              <input
+                value={f.nome}
+                onChange={(e) => setF({ ...f, nome: e.target.value })}
+              />
+            </Field>
+
+            <Field label="E-mail" error={err.email}>
+              <input
+                value={f.email}
+                onChange={(e) => setF({ ...f, email: e.target.value })}
+              />
+            </Field>
+
+            <Field label="Assunto" error={err.assunto}>
+              <input
+                value={f.assunto}
+                onChange={(e) => setF({ ...f, assunto: e.target.value })}
+              />
+            </Field>
+
+            <Field label="Mensagem" error={err.mensagem}>
+              <textarea
+                value={f.mensagem}
+                onChange={(e) => setF({ ...f, mensagem: e.target.value })}
+              />
+            </Field>
+          </div>
+
+          <div className="modal-actions">
+            <button className="btn primary" onClick={submit}>
+              <Icon name="check" />
+              Enviar mensagem
+            </button>
+          </div>
+        </section>
+
+        <section className="card team-card">
+            <div className="team-card-content">
+              <h3>Dados da equipe</h3>
+    
+              <p>Turma 1TDSPS · Global Solution 2026/1</p>
+    
+              <p className="github-line">
+                GitHub:{' '}
+                <a
+                  href="https://github.com/GuilhermeEustaquio/CarbonTrack"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="github-gradient-link"
+                >
+                  CarbonTrack
+                </a>
+              </p>
+            </div>
+    
+            <div className="team-logo-area">
+              <img
+                src="/favicon.svg"
+                alt="Logo da equipe CarbonTrack"
+                className="team-logo"
+              />
+            </div>
+        </section>
+      </div>
+
+      {node}
+    </div>
+  );
+}
